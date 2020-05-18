@@ -1,0 +1,678 @@
+---
+title: "Midterm Project"
+author: "Ziyu Jin"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    #number_sections: yes
+    theme: cosmo
+    toc: yes
+    toc_depth: 3
+    toc_float: yes
+  # pdf_document: 
+  #   latex_engine: xelatex
+  
+---
+
+```{r setup, include=FALSE}
+# Prepare the environment
+knitr::opts_chunk$set(
+	fig.width = 8.5,
+	message = FALSE,
+	warning = FALSE,
+	# include = FALSE,
+	echo = FALSE
+)
+
+options(tinytex.verbose = TRUE)
+
+# Clear environment of variables and functions
+rm(list = ls(all = TRUE)) 
+
+# Clear environment of packages
+if(is.null(sessionInfo()$otherPkgs) == FALSE) {
+  lapply(paste("package:", names(sessionInfo()$otherPkgs), sep=""), 
+         detach, character.only = TRUE, unload = TRUE)
+}
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# Load Packages
+#install.packages("lpSolve")
+#install.packages("lpSolveAPI")
+library(lpSolve)
+library(lpSolveAPI)
+#library(tidyverse)
+`%>%` <- magrittr::`%>%`
+library(knitr)
+library(kableExtra)
+library(igraph)
+```
+
+
+# Q1 Network Map
+```{r}
+# Data matrix, could also import data file
+seer <- matrix(nc = 2, byrow = TRUE, 
+              c(1, 3, 
+                1, 4, 
+                1, 5,
+                1, 6,
+                1, 7,
+                1, 8,
+                2, 3, 
+                2, 4,
+                2, 5,
+                2, 6,
+                2, 7,
+                2, 8,
+                3, 9, 
+                3, 10, 
+                3, 11, 
+                4, 9, 
+                4, 10,
+                4, 11,
+                5, 9, 
+                5, 10,
+                5, 11,
+                6, 9, 
+                6, 10,
+                6, 11,
+                7, 9, 
+                7, 10,
+                7, 11,
+                8, 9, 
+                8, 10,
+                8, 11)) 
+
+# Make graph by setting 7 nodes/vertices, edges from nodes/vertices and distances from data matrix
+g <- add_edges(make_empty_graph(n = 11, directed = FALSE), 
+               t(seer[, 1:2])) %>%
+
+  # Set vertice/node names 
+  set_vertex_attr("name", value = c("NY","JF","DS","LG","LA","KS","LZ","NK","NN","NC","KC"))
+
+# Set coordinates so looks similar to book diagram
+  ## This is just for visualization, but could include it in data file
+g$layout <- matrix(c(0,   0,   150, 150, 150, 170, 170, 170,  250, 250, 250,
+                     150, 100, 200, 170, 140, 110,  80,  50,  180, 120, 60), nc = 2)
+
+# Lable edges with the distance or weight
+# E(g)$label <- seer[, 3]
+
+```
+
+
+
+```{r}
+# Show network graph
+plot(g)
+
+```
+
+
+# Q2 Shortest Path
+
+
++ How can Gail McGovern and the IFRC most quickly move workers from the United States to each of the nine IFRC cities? 
++ How long will it take workers and supplies to reach each city using the quickest route? 
++ Which routes appear to have significant time bottlenecks that the IFRC should work to reduce? 
++ Provide a table and/or network map indicating the quickest route and travel time between the United States and African cities on the network.
+
+
+
+```{r}
+# Data matrix, could also import data file
+seer <- matrix(nc = 3, byrow = TRUE, 
+              c(1, 4, 172,
+                1, 5, 186,
+                1, 6, 18,
+                2, 3, 112,
+                2, 7, 20,
+                2, 8, 20,
+                6, 9, 5,
+                6, 10, 2,
+                7, 11, 3)) 
+ 
+
+# Make graph by setting 11 nodes/vertices, edges from nodes/vertices and distances from data matrix
+g <- add_edges(make_empty_graph(n = 11, directed = FALSE), 
+               t(seer[, 1:2]), weight=seer[,3]) %>%
+  
+  # Set vertice/node names 
+  set_vertex_attr("name", value = c("NY","JF","DS","LG","LA","KS","LZ","NK","NN","KC","NC"))
+
+# Set coordinates so looks similar to book diagram
+  ## This is just for visualization, but could include it in data file
+g$layout <- matrix(c(0,   0,   150, 150, 150, 170, 170, 170,  250, 250, 250,
+                     150, 100, 200, 170, 140, 110,  80,  50,  180, 120, 60), nc = 2)
+
+# Lable edges with the distance or weight
+E(g)$label <- seer[, 3]
+#E(g)$label.cex <- 0.5
+
+# Show network graph
+plot(g)
+
+```
+
+
+```{r}
+# Show network graph
+plot(g)
+
+```
+
+# Q3 Minimum Cost
+
++ How should the IFRC satisfy each African city’s need requirements at minimum cost? 
++ Again, where are the significant bottlenecks in the system that the IFRC should work to reduce? 
++ Provide a table and/or network map highlighting the least cost route between the U.S. and African cities.
+
+```{r echo = FALSE, include = FALSE}
+# Set up model
+mc <- make.lp(0, 27)
+
+# Set objective fn 
+obj_fn <- c(32, 30, 30, 45, 50, 55, 56, 48, 44, 49, 57, 61, 5, 9, 4, 7, 5, 8, 22, 19, 4, 24, 22, 23, 28, 25, 2)
+set.objfn(mc, obj_fn)
+
+# Run as min
+lp.control(mc, sense = "min")
+
+# Add constraints
+add.constraint(mc, c( 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "=", 500000) #NY output
+add.constraint(mc, c( 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "=", 500000) #JF output
+add.constraint(mc, c( -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "=", -50000) #DS demand
+add.constraint(mc, c( 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "=", -100000) #LG demand
+add.constraint(mc, c( 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0), "=", -130000) #LA demand
+add.constraint(mc, c( 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0), "=", -90000) #KS demand
+add.constraint(mc, c( 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0), "=", -150000) #LZ demand
+add.constraint(mc, c( 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1), "=", -120000) #NK demand
+add.constraint(mc, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0), "=", -100000) #NN demand
+add.constraint(mc, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, -1, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0), "=", -180000) #KC demand
+add.constraint(mc, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, -1, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1), "=", -80000) #NC demand
+
+add.constraint(mc, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 14868) #DS-NC truck restriction 840 * 17.7
+add.constraint(mc, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 14868) #LG-NC truck restriction 840 * 17.7
+add.constraint(mc, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 14868) #LA-NC truck restriction 840 * 17.7
+add.constraint(mc, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0), "<=", 30000) #KS-NC air restriction 200 * 150
+add.constraint(mc, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0), "<=", 30000) #LZ-NC air restriction 200 * 150
+
+# Add names
+dimnames(mc) <- list(c("NY", "JF","DS", "LG", "LA", "KS", "LZ", "NK", "NN", "KC", "NC", "U(DS-NC)", "U(LG-NC)", "U(LA-NC)", "U(KS-NC)", "U(LZ-NC)"), 
+                      c("NY-DS", "NY-LG", "NY-LA", "NY-KS", "NY-LZ", "NY-NK", "JF-DS", "JF-LG", "JF-LA", "JF-KS", "JF-LZ", "JF-NK", "DS-KC", "DS-NC", "LG-KC", "LG-NC", "LA-KC", "LA-NC", "KS-NN", "KS-KC", "KS-NC", "LZ-NN", "LZ-KC", "LZ-NC", "NK-NN", "NK-KC", "NK-NC"))
+
+# Write to view the algebraic formulation
+write.lp(mc, "mc.lp",type = 'lp')
+
+# Solve the model
+solve(mc)
+```
+
+
+```{r echo = FALSE, include = FALSE}
+# Make solution/sensitivity analysis table
+# Get primal solution
+ps <- get.primal.solution(mc)
+
+# Have to re-enter obj fn to get Sens Ana table since cannot pull from model
+obj_fn <- c(32, 30, 30, 45, 50, 55, 56, 48, 44, 49, 57, 61, 5, 9, 4, 7, 5, 8, 22, 19, 4, 24, 22, 23, 28, 25, 2)
+
+# Get sensitivity analysis
+obj_sa <- get.sensitivity.obj(mc)
+rhs_sa <- get.sensitivity.rhs(mc)
+
+n <- length(get.variables(mc))
+m <- length(get.constr.type(mc))
+ov <- paste0("Objective Value = ", ps[1])
+
+sa_tab <- rbind(ps[2:(n + m + 1)], 
+                c(round(rhs_sa$duals[1:m], 2), obj_fn),
+                round(c(rhs_sa$dualsfrom[1:m],obj_sa$objfrom), 2),
+                round(c(rhs_sa$dualstill[1:m],obj_sa$objtill), 2)) 
+colnames(sa_tab) <- c(rownames(mc), colnames(mc))
+rownames(sa_tab) <- c("solution", "duals/coef", "Sens From", "Sens Till")      
+
+# Substitute "inf" and "-inf" so tables are easier to read (coded by two classmates!)
+sa_tab <- ifelse(sa_tab == -1.000e+30, "-inf", sa_tab)
+sa_tab <- ifelse(sa_tab == 1.000e+30, "inf", sa_tab)
+
+```
+
+```{r echo = FALSE}
+# Print the table
+kable(sa_tab, format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped", "bordered")) %>% 
+  add_footnote(label = ov, notation = "none")
+
+```
+
+```{r}
+# Set up model
+sp <- make.lp(0, 30)
+
+
+
+# Set objective fn and constraints
+
+obj_fn <- c(32, 30, 30, 45, 50, 55, 56, 48, 44, 49, 57, 61, 5, 5, 9, 3, 4, 7, 3, 5, 8, 22, 19, 4, 24, 22, 23, 28, 25, 2)
+set.objfn(sp, obj_fn)
+
+# Add and constraints
+
+add.constraint(sp, c( 240, 240, 240, 150, 150, 150, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "=", 500000) #NY
+add.constraint(sp, c( 0, 0, 0, 0, 0, 0, 240, 240, 240, 150, 150, 150, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "=", 500000) #JF
+add.constraint(sp, c( -240, 0, 0, 0, 0, 0, -240, 0, 0, 0, 0, 0, 17.7, 17.7, 17.7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "=", -50000) #DS
+add.constraint(sp, c( 0, -240, 0, 0, 0, 0, 0, -240, 0, 0, 0, 0, 0, 0, 0, 17.7, 17.7, 17.7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "=", -100000) #LG
+add.constraint(sp, c( 0, 0, -240, 0, 0, 0, 0, 0, -240, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17.7, 17.7, 17.7, 0, 0, 0, 0, 0, 0, 0, 0, 0), "=", -130000) #LA
+add.constraint(sp, c( 0, 0, 0, -150, 0, 0, 0, 0, 0, -150, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 150, 150, 150, 0, 0, 0, 0, 0, 0), "=", -90000) #KS
+add.constraint(sp, c( 0, 0, 0, 0, -150, 0, 0, 0, 0, 0, -150, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  150, 150, 150, 0, 0, 0), "=", -150000) #LZ
+add.constraint(sp, c( 0, 0, 0, 0, 0, -150, 0, 0, 0, 0, 0, -150, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  150, 150, 150), "=", -120000) #NK
+add.constraint(sp, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.7, 0, 0, -17.7, 0, 0, -17.7, 0, 0, -150, 0, 0, -150, 0, 0, -150, 0, 0), "=", -100000) #NN
+add.constraint(sp, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.7, 0, 0, -17.7, 0, 0, -17.7, 0, 0, -150, 0, 0, -150, 0, 0, -150, 0), "=", -180000) #KC
+add.constraint(sp, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -17.7, 0, 0, -17.7, 0, 0, -17.7, 0, 0, -150, 0, 0, -150, 0, 0, -150), "=", -80000) #NC
+add.constraint(sp, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 0) # DS NN 0
+add.constraint(sp, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 0) # LG NN 0
+add.constraint(sp, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 0) # LA NN 0
+add.constraint(sp, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 840) # DS NC 17.7 *840
+add.constraint(sp, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 840) # LG NC
+add.constraint(sp, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 840) # LA NC
+add.constraint(sp, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0), "<=", 200) # KS NC 150*200
+add.constraint(sp, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0), "<=", 200) # LZ NC
+
+
+# Add names
+dimnames(sp) <- list(c("NY", "JF","DS", "LG", "LA", "KS", "LZ", "NK", "NN", "KC", "NC", "UDS-NN", "ULG-NN", "ULA_NN", "UDS-NC","ULG-NC","ULA-NC","UKS-NC","ULZ-NC"), 
+                      c("NY-DS", "NY-LG", "NY-LA", "NY-KS", "NY-LZ", "NY-NK", "JF-DS", "JF-LG", "JF-LA", "JF-KS", "JF-LZ", "JF-NK", "DS-NN", "DS-KC", "DS-NC", "LG-NN", "LG-KC", "LG-NC", "LA-NN", "LA-KC", "LA-NC", "KS-NN", "KS-KC", "KS-NC", "LZ-NN", "LZ-KC", "LZ-NC", "NK-NN", "NK-KC", "NK-NC"))
+
+# Write to view the algebraic formulation
+write.lp(sp, "sp30-1.lp",type = 'lp')
+
+# Solve the model
+solve(sp)
+```
+
+```{r echo = FALSE, include = FALSE}
+# Make results and sensitivity table 
+ps <- get.primal.solution(sp)
+obj_sa <- get.sensitivity.obj(sp)
+rhs_sa <- get.sensitivity.rhs(sp)
+
+nv <- length(get.variables(sp))
+mc <- length(get.constr.type(sp))
+ov <- paste0("Objective Value = ", ps[1])
+
+sa_tab <- rbind(round(ps[2:(nv + mc + 1)], 2), 
+                round(c(rhs_sa$duals[1:mc], obj_fn), 2),
+                round(c(rhs_sa$dualsfrom[1:mc],obj_sa$objfrom), 2),
+                round(c(rhs_sa$dualstill[1:mc],obj_sa$objtill), 2)) 
+colnames(sa_tab) <- c(rownames(sp), colnames(sp))
+rownames(sa_tab) <- c("solution", "duals/coef", "Sens From", "Sens Till")      
+
+# Substitute "inf" and "-inf" so tables are easier to read (coded by two classmates!)
+sa_tab <- ifelse(sa_tab == -1.000e+30, "-inf", sa_tab)
+sa_tab <- ifelse(sa_tab == 1.000e+30, "inf", sa_tab)
+
+```
+
+
+```{r echo = FALSE}
+# Print the table
+knitr::kable(sa_tab, format.args = list(big.mark = ",")) %>%
+  kableExtra::kable_styling(bootstrap_options = c("striped", "bordered")) %>% 
+  kableExtra::add_footnote(label = ov, notation = "none")
+
+```
+
+
+# Q4 Max Flow
+
++ How can the IFRC maximize the total amount of cargo that reaches Africa?
++ Again, where are the significant bottlenecks in the system that the IFRC should work to reduce?
++ Provide a table and/or network map highlighting the maximum cargo and routes between the U.S. and African cities.
+
+
+```{r echo = FALSE, include = FALSE}
+# Set up model
+mf <- make.lp(0, 30)
+
+# Set objective fn 
+obj_fn <- c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+set.objfn(mf, obj_fn)
+
+# Run as max
+lp.control(mf, sense = "max")
+
+# Add constraints
+add.constraint(mf, c( 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 500000) #NY output
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 500000) #JF output
+add.constraint(mf, c( -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ">=", -50000) #DS demand
+add.constraint(mf, c( 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ">=", -100000) #LG demand
+add.constraint(mf, c( 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0), ">=", -130000) #LA demand
+add.constraint(mf, c( 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0), ">=", -90000) #KS demand
+add.constraint(mf, c( 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0), ">=", -150000) #LZ demand
+add.constraint(mf, c( 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1), ">=", -120000) #NK demand
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0), ">=", -100000) #NN demand
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0), ">=", -180000) #KC demand
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1), ">=", -80000) #NC demand
+
+add.constraint(mf, c( 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 75000) #NY-KS air restriction 500 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 45000) #NY-LZ air restriction 300 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 75000) #NY-NK air restriction 500 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 90000) #JF-KS air restriction 600 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 75000) #JF-LZ air restriction 500 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 105000) #JF-NK air restriction 700 * 150
+
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 13452) #DS-KC Truck restriction 760 * 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 7965) #DS-NC truck restriction 450* 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 5310) #LG-KC truck restriction 300 * 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 2832) #LG-NC truck restriction 160 * 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 4425) #LA-KC truck restriction 250 * 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 4248) #LA-NC truck restriction 240 * 17.7
+
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 45000) #KS-NN air restriction 300 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0), "<=", 12000) #KS-KC air restriction 80 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0), "<=", 6000) #KS-NC air restriction 40 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0), "<=", 30000) #LZ-NN air restriction 200 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0), "<=", 21000) #LZ-KC air restriction 140 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0), "<=", 0) #LZ-NC air restriction 0 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0), "<=", 0) #NK-NN air restriction 0 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0), "<=", 6000) #NK-KC air restriction 40 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1), "<=", 45000) #NK-NC air restriction 300 * 150
+
+
+# Add names
+dimnames(mf) <- list(c("NY", "JF","DS", "LG", "LA", "KS", "LZ", "NK", "NN", "KC", "NC", "U(NY-KS)", "U(NY-LZ)", "U(NY-NK)", "U(JF-KS)", "U(JF-LZ)", "U(JF-NK)", "U(DS-KC)", "U(DS-NC)", "U(LG-KC)", "U(LG-NC)", "U(LA-KC)", "U(LA-NC)", "U(KS-NN)", "U(KS-KC)", "U(KS-NC)", "U(LZ-NN)", "U(LZ-KC)", "U(LZ-NC)", "U(NK-NN)", "U(NK-KC)", "U(NK-NC)"), 
+                      c("NY-DS", "NY-LG", "NY-LA", "NY-KS", "NY-LZ", "NY-NK", "JF-DS", "JF-LG", "JF-LA", "JF-KS", "JF-LZ", "JF-NK", "DS-NN", "DS-KC", "DS-NC", "LG-NN", "LG-KC", "LG-NC", "LA-NN", "LA-KC", "LA-NC", "KS-NN", "KS-KC", "KS-NC", "LZ-NN", "LZ-KC", "LZ-NC", "NK-NN", "NK-KC", "NK-NC"))
+
+# Write to view the algebraic formulation
+#write.lp(mf, "mf.lp",type = 'lp')
+
+# Solve the model
+solve(mf)
+```
+
+
+```{r echo = FALSE, include = FALSE}
+# Make solution/sensitivity analysis table
+# Get primal solution
+ps <- get.primal.solution(mf)
+
+# Have to re-enter obj fn to get Sens Ana table since cannot pull from model
+obj_fn <- c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+
+# Get sensitivity analysis
+obj_sa <- get.sensitivity.obj(mf)
+rhs_sa <- get.sensitivity.rhs(mf)
+
+n <- length(get.variables(mf))
+m <- length(get.constr.type(mf))
+ov <- paste0("Objective Value = ", ps[1])
+
+sa_tab <- rbind(ps[2:(n + m + 1)], 
+                c(round(rhs_sa$duals[1:m], 2), obj_fn),
+                round(c(rhs_sa$dualsfrom[1:m],obj_sa$objfrom), 2),
+                round(c(rhs_sa$dualstill[1:m],obj_sa$objtill), 2)) 
+colnames(sa_tab) <- c(rownames(mf), colnames(mf))
+rownames(sa_tab) <- c("solution", "duals/coef", "Sens From", "Sens Till")      
+
+# Substitute "inf" and "-inf" so tables are easier to read (coded by two classmates!)
+sa_tab <- ifelse(sa_tab == -1.000e+30, "-inf", sa_tab)
+sa_tab <- ifelse(sa_tab == 1.000e+30, "inf", sa_tab)
+
+```
+
+```{r echo = FALSE}
+# Print the table
+kable(sa_tab, format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped", "bordered")) %>% 
+  add_footnote(label = ov, notation = "none")
+
+```
+
+
+```{r echo = FALSE, include = FALSE}
+# Set up model
+mf <- make.lp(0, 27)
+
+# Set objective fn 
+obj_fn <- c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+set.objfn(mf, obj_fn)
+
+# Run as max
+lp.control(mf, sense = "max")
+
+# Add constraints
+add.constraint(mf, c( 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 500000) #NY output
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 500000) #JF output
+add.constraint(mf, c( -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ">=", -50000) #DS demand
+add.constraint(mf, c( 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ">=", -100000) #LG demand
+add.constraint(mf, c( 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0), ">=", -130000) #LA demand
+add.constraint(mf, c( 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0), ">=", -90000) #KS demand
+add.constraint(mf, c( 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0), ">=", -150000) #LZ demand
+add.constraint(mf, c( 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1), ">=", -120000) #NK demand
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0), ">=", -100000) #NN demand
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, -1, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0), ">=", -180000) #KC demand
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, -1, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1), ">=", -80000) #NC demand
+
+add.constraint(mf, c( 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 75000) #NY-KS air restriction 500 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 45000) #NY-LZ air restriction 300 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 75000) #NY-NK air restriction 500 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 90000) #JF-KS air restriction 600 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 75000) #JF-LZ air restriction 500 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 105000) #JF-NK air restriction 700 * 150
+
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 13452) #DS-KC Truck restriction 760 * 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 7965) #DS-NC truck restriction 450* 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 5310) #LG-KC truck restriction 300 * 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 2832) #LG-NC truck restriction 160 * 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 4425) #LA-KC truck restriction 250 * 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 4248) #LA-NC truck restriction 240 * 17.7
+
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 45000) #KS-NN air restriction 300 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0), "<=", 12000) #KS-KC air restriction 80 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0), "<=", 6000) #KS-NC air restriction 40 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0), "<=", 30000) #LZ-NN air restriction 200 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0), "<=", 21000) #LZ-KC air restriction 140 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0), "<=", 0) #LZ-NC air restriction 0 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0), "<=", 0) #NK-NN air restriction 0 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0), "<=", 6000) #NK-KC air restriction 40 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1), "<=", 45000) #NK-NC air restriction 300 * 150
+
+
+# Add names
+dimnames(mf) <- list(c("NY", "JF","DS", "LG", "LA", "KS", "LZ", "NK", "NN", "KC", "NC", "U(NY-KS)", "U(NY-LZ)", "U(NY-NK)", "U(JF-KS)", "U(JF-LZ)", "U(JF-NK)", "U(DS-KC)", "U(DS-NC)", "U(LG-KC)", "U(LG-NC)", "U(LA-KC)", "U(LA-NC)", "U(KS-NN)", "U(KS-KC)", "U(KS-NC)", "U(LZ-NN)", "U(LZ-KC)", "U(LZ-NC)", "U(NK-NN)", "U(NK-KC)", "U(NK-NC)"), 
+                      c("NY-DS", "NY-LG", "NY-LA", "NY-KS", "NY-LZ", "NY-NK", "JF-DS", "JF-LG", "JF-LA", "JF-KS", "JF-LZ", "JF-NK", "DS-KC", "DS-NC", "LG-KC", "LG-NC", "LA-KC", "LA-NC", "KS-NN", "KS-KC", "KS-NC", "LZ-NN", "LZ-KC", "LZ-NC", "NK-NN", "NK-KC", "NK-NC"))
+
+# Write to view the algebraic formulation
+#write.lp(mf, "mf.lp",type = 'lp')
+
+# Solve the model
+solve(mf)
+```
+
+
+```{r echo = FALSE, include = FALSE}
+# Make solution/sensitivity analysis table
+# Get primal solution
+ps <- get.primal.solution(mf)
+
+# Have to re-enter obj fn to get Sens Ana table since cannot pull from model
+obj_fn <- c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+
+# Get sensitivity analysis
+obj_sa <- get.sensitivity.obj(mf)
+rhs_sa <- get.sensitivity.rhs(mf)
+
+n <- length(get.variables(mf))
+m <- length(get.constr.type(mf))
+ov <- paste0("Objective Value = ", ps[1])
+
+sa_tab <- rbind(ps[2:(n + m + 1)], 
+                c(round(rhs_sa$duals[1:m], 2), obj_fn),
+                round(c(rhs_sa$dualsfrom[1:m],obj_sa$objfrom), 2),
+                round(c(rhs_sa$dualstill[1:m],obj_sa$objtill), 2)) 
+colnames(sa_tab) <- c(rownames(mf), colnames(mf))
+rownames(sa_tab) <- c("solution", "duals/coef", "Sens From", "Sens Till")      
+
+# Substitute "inf" and "-inf" so tables are easier to read (coded by two classmates!)
+sa_tab <- ifelse(sa_tab == -1.000e+30, "-inf", sa_tab)
+sa_tab <- ifelse(sa_tab == 1.000e+30, "inf", sa_tab)
+
+```
+
+```{r echo = FALSE}
+# Print the table
+kable(sa_tab, format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped", "bordered")) %>% 
+  add_footnote(label = ov, notation = "none")
+
+```
+
+
+```{r echo = FALSE, include = FALSE}
+# Set up model
+mf <- make.lp(0, 30)
+
+# Set objective fn 
+obj_fn <- c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+set.objfn(mf, obj_fn)
+
+# Run as max
+lp.control(mf, sense = "max")
+
+# Add constraints
+add.constraint(mf, c( 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 500000) #NY output
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 500000) #JF output
+add.constraint(mf, c( -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ">=", -50000) #DS demand
+add.constraint(mf, c( 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), ">=", -100000) #LG demand
+add.constraint(mf, c( 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0), ">=", -130000) #LA demand
+add.constraint(mf, c( 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0), ">=", -90000) #KS demand
+add.constraint(mf, c( 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0), ">=", -150000) #LZ demand
+add.constraint(mf, c( 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1), ">=", -120000) #NK demand
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0), ">=", -100000) #NN demand
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0), ">=", -180000) #KC demand
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1), ">=", -80000) #NC demand
+
+add.constraint(mf, c( 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 500 * 150) #NY-KS air restriction 500 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 300 * 150) #NY-LZ air restriction 300 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 500 * 150) #NY-NK air restriction 500 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 600 * 150) #JF-KS air restriction 600 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 500 * 150) #JF-LZ air restriction 500 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 700 * 150) #JF-NK air restriction 700 * 150
+
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 700 * 17.7) #DS-KC Truck restriction 700 * 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 450* 17.7) #DS-NC truck restriction 450* 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 300 * 17.7) #LG-KC truck restriction 300 * 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 160 * 17.7) #LG-NC truck restriction 160 * 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 250 * 17.7) #LA-KC truck restriction 250 * 17.7
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 240 * 17.7) #LA-NC truck restriction 240 * 17.7
+
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0), "<=", 300 * 150) #KS-NN air restriction 300 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0), "<=", 80 * 150) #KS-KC air restriction 80 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0), "<=", 40 * 150) #KS-NC air restriction 40 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0), "<=", 200 * 150) #LZ-NN air restriction 200 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0), "<=", 140 * 150) #LZ-KC air restriction 140 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0), "<=", 0) #LZ-NC air restriction 0 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0), "<=", 0) #NK-NN air restriction 0 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0), "<=", 40 * 150) #NK-KC air restriction 40 * 150
+add.constraint(mf, c( 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1), "<=", 300 * 150) #NK-NC air restriction 300 * 150
+
+
+# Add names
+dimnames(mf) <- list(c("NY", "JF","DS", "LG", "LA", "KS", "LZ", "NK", "NN", "KC", "NC", "U(NY-KS)", "U(NY-LZ)", "U(NY-NK)", "U(JF-KS)", "U(JF-LZ)", "U(JF-NK)", "U(DS-KC)", "U(DS-NC)", "U(LG-KC)", "U(LG-NC)", "U(LA-KC)", "U(LA-NC)", "U(KS-NN)", "U(KS-KC)", "U(KS-NC)", "U(LZ-NN)", "U(LZ-KC)", "U(LZ-NC)", "U(NK-NN)", "U(NK-KC)", "U(NK-NC)"), 
+                      c("NY-DS", "NY-LG", "NY-LA", "NY-KS", "NY-LZ", "NY-NK", "JF-DS", "JF-LG", "JF-LA", "JF-KS", "JF-LZ", "JF-NK", "DS-NN", "DS-KC", "DS-NC", "LG-NN", "LG-KC", "LG-NC", "LA-NN", "LA-KC", "LA-NC", "KS-NN", "KS-KC", "KS-NC", "LZ-NN", "LZ-KC", "LZ-NC", "NK-NN", "NK-KC", "NK-NC"))
+
+# Write to view the algebraic formulation
+#write.lp(mf, "mf.lp",type = 'lp')
+
+# Solve the model
+solve(mf)
+```
+
+
+
+```{r echo = FALSE, include = FALSE}
+# Make solution/sensitivity analysis table
+# Get primal solution
+ps <- get.primal.solution(mf)
+
+# Have to re-enter obj fn to get Sens Ana table since cannot pull from model
+obj_fn <- c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+
+# Get sensitivity analysis
+obj_sa <- get.sensitivity.obj(mf)
+rhs_sa <- get.sensitivity.rhs(mf)
+
+n <- length(get.variables(mf))
+m <- length(get.constr.type(mf))
+ov <- paste0("Objective Value = ", ps[1])
+
+sa_tab <- rbind(ps[2:(n + m + 1)], 
+                c(round(rhs_sa$duals[1:m], 2), obj_fn),
+                round(c(rhs_sa$dualsfrom[1:m],obj_sa$objfrom), 2),
+                round(c(rhs_sa$dualstill[1:m],obj_sa$objtill), 2)) 
+colnames(sa_tab) <- c(rownames(mf), colnames(mf))
+rownames(sa_tab) <- c("solution", "duals/coef", "Sens From", "Sens Till")      
+
+# Substitute "inf" and "-inf" so tables are easier to read (coded by two classmates!)
+sa_tab <- ifelse(sa_tab == -1.000e+30, "-inf", sa_tab)
+sa_tab <- ifelse(sa_tab == 1.000e+30, "inf", sa_tab)
+
+```
+
+```{r echo = FALSE}
+# Print the table
+kable(sa_tab, format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped", "bordered")) %>% 
+  add_footnote(label = ov, notation = "none")
+
+```
+
+
+```{r echo = FALSE, include = FALSE}
+# Make solution/sensitivity analysis table
+# Get primal solution
+ps <- get.primal.solution(mf)
+
+# Have to re-enter obj fn to get Sens Ana table since cannot pull from model
+obj_fn <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+
+# Get sensitivity analysis
+obj_sa <- get.sensitivity.obj(mf)
+rhs_sa <- get.sensitivity.rhs(mf)
+
+n <- length(get.variables(mf))
+m <- length(get.constr.type(mf))
+ov <- paste0("Objective Value = ", ps[1])
+
+sa_tab <- rbind(ps[2:(n + m + 1)], 
+                c(round(rhs_sa$duals[1:m], 2), obj_fn),
+                round(c(rhs_sa$dualsfrom[1:m],obj_sa$objfrom), 2),
+                round(c(rhs_sa$dualstill[1:m],obj_sa$objtill), 2)) 
+colnames(sa_tab) <- c(rownames(mf), colnames(mf))
+rownames(sa_tab) <- c("solution", "duals/coef", "Sens From", "Sens Till")      
+
+# Substitute "inf" and "-inf" so tables are easier to read (coded by two classmates!)
+sa_tab <- ifelse(sa_tab == -1.000e+30, "-inf", sa_tab)
+sa_tab <- ifelse(sa_tab == 1.000e+30, "inf", sa_tab)
+
+```
+
+```{r echo = FALSE}
+# Print the table
+kable(sa_tab, format.args = list(big.mark = ",")) %>%
+  kable_styling(bootstrap_options = c("striped", "bordered")) %>% 
+  add_footnote(label = ov, notation = "none")
+
+```
+
+
+
+
+
+
+
+
